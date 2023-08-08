@@ -4,6 +4,7 @@ from telegram import Bot
 from dotenv import load_dotenv
 import os
 import logging
+from telegram import TelegramError
 
 load_dotenv()
 
@@ -30,11 +31,23 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Валидация токенов."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID or not PRACTICUM_TOKEN:
+    missing_tokens = []
+
+    for token_name, token_value in [
+        ('TELEGRAM_TOKEN', TELEGRAM_TOKEN),
+        ('TELEGRAM_CHAT_ID', TELEGRAM_CHAT_ID),
+        ('PRACTICUM_TOKEN', PRACTICUM_TOKEN)
+    ]:
+        if not token_value:
+            missing_tokens.append(token_name)
+
+    if missing_tokens:
         logger.critical(
-            'Отсутствуют необходимые токены. Программа завершает работу.'
+            f'Токены {", ".join(missing_tokens)} отсутствуют. '
+            f'Программа завершает работу.'
         )
         exit()
+
     return True
 
 
@@ -43,31 +56,30 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug("Сообщение успешно отправлено в Telegram")
-    except Exception as e:
+    except TelegramError as e:
         logger.error(f"Ошибка при отправке сообщения в Telegram: {e}")
 
 
 def get_api_answer(timestamp):
     """Получение ответа."""
+    payload = {
+        'from_date': timestamp
+    }
     try:
-        payload = {
-            'from_date': timestamp
-        }
         response = requests.get(
             ENDPOINT,
             headers=HEADERS,
             params=payload
         )
         response.raise_for_status()
-        if response.status_code != 200:
-            logger.error(f"API вернул статус код {response.status_code}")
-            raise Exception(f"API вернул статус код {response.status_code}.")
+    except requests.exceptions.RequestException as e:
+        logger.error(f'ошибка во время выполнения запроса {e}')
+        # при использовании другого исключения - тест падает
+        raise Exception(f'ошибка во время выполнения запроса {e}')
 
-    except requests.exceptions.HTTPError:
-        raise
-    except requests.RequestException as e:
-        logger.error(f"Ошибка при запросе к API: {e}")
-        raise Exception(f"Ошибка при запросе к API: {e}")
+    if response.status_code != 200:
+        logger.error('HTTP ошибка')
+        raise requests.exceptions.HTTPError('HTTP ошибка')
     return response.json()
 
 
@@ -78,7 +90,7 @@ def check_response(response):
         raise TypeError("Ответ не является словарём")
     if 'homeworks' not in response or 'current_date' not in response:
         logger.error("Нужных ключей нет в ответе")
-        raise AssertionError("Нужных ключей нет в ответе")
+        raise KeyError("Нужных ключей нет в ответе")
     if not isinstance(response['homeworks'], list):
         logger.error("Данные домашки не представлены в виде списка")
         raise TypeError("Данные домашки не представлены в виде списка")
