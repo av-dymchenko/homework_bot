@@ -75,7 +75,7 @@ def get_api_answer(timestamp):
     except requests.exceptions.RequestException as e:
         logger.error(f'ошибка во время выполнения запроса {e}')
         # при использовании другого исключения - тест падает
-        raise Exception(f'ошибка во время выполнения запроса {e}')
+        raise Exception.HTTPError (f'ошибка во время выполнения запроса {e}')
 
     if response.status_code != 200:
         logger.error('HTTP ошибка')
