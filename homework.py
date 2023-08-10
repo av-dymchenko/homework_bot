@@ -74,7 +74,7 @@ def get_api_answer(timestamp):
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         logger.error(f'ошибка во время выполнения запроса {e}')
-        raise Exception.ConnectionError(
+        raise ConnectionError(
             f'ошибка во время выполнения запроса {e}'
         )
 
